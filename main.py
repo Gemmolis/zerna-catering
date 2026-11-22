@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
+import html
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -67,12 +68,20 @@ class Customer(BaseModel):
     vk: Optional[str] = None
 
 
+class EventData(BaseModel):
+    type: Optional[str] = None
+    format: Optional[str] = None
+    date: Optional[str] = None
+    guestCount: Optional[int] = None
+
 class OrderData(BaseModel):
-    pickupType: str = Field(..., description="in_cafe / takeaway / preorder")
+    pickupType: str = Field(..., description="delivery / pickup")
+    deliveryAddress: Optional[str] = None
     comment: Optional[str] = None
     items: List[OrderItem]
     totalCount: int
     totalPrice: float
+    event: Optional[EventData] = None
 
 
 class Consents(BaseModel):
@@ -180,42 +189,99 @@ def generate_order_id() -> str:
     return now.strftime("RZ-%Y%m%d-%H%M%S")
 
 
+
 def build_admin_message(order_id: str, data: IncomingOrder) -> str:
-    """Формируем текст сообщения админу."""
+    """Формируем уведомление о заявке для менеджера."""
+
+    def safe(value):
+        return html.escape(str(value if value is not None else ""))
+
     lines = [
-        f"<b>Новый заказ {order_id}</b>",
+        f"<b>Новая заявка на кейтеринг № {safe(order_id)}</b>",
         "",
-        f"<b>Имя:</b> {data.customer.name}",
-        f"<b>Телефон:</b> {data.customer.phone}",
     ]
 
+    event = data.order.event
+
+    if event:
+        type_map = {
+            "corporate": "Корпоративное",
+            "private": "Частное",
+        }
+        format_map = {
+            "buffet": "Фуршет",
+            "coffee-break": "Кофе-брейк",
+            "banquet": "Банкет",
+        }
+
+        lines.append("<b>Мероприятие:</b>")
+        lines.append(
+            f"Тип: {safe(type_map.get(event.type, event.type))}"
+        )
+        lines.append(
+            f"Формат: {safe(format_map.get(event.format, event.format))}"
+        )
+        lines.append(f"Дата: {safe(event.date)}")
+        lines.append(f"Количество гостей: {safe(event.guestCount)}")
+        lines.append("")
+
+    lines.extend([
+        f"<b>Имя:</b> {safe(data.customer.name)}",
+        f"<b>Телефон:</b> {safe(data.customer.phone)}",
+    ])
+
     if data.customer.vk:
-        lines.append(f"<b>VK:</b> {data.customer.vk}")
+        lines.append(f"<b>VK:</b> {safe(data.customer.vk)}")
 
     pickup_map = {
+        "delivery": "Доставка",
+        "pickup": "Самовывоз",
         "in_cafe": "В кафе",
         "takeaway": "С собой",
         "preorder": "Предзаказ ко времени",
-    }
-    pickup_label = pickup_map.get(data.order.pickupType, data.order.pickupType)
-    lines.append(f"<b>Способ получения:</b> {pickup_label}")
+}
+
+    pickup_label = pickup_map.get(
+        data.order.pickupType,
+        data.order.pickupType
+    )
+    lines.append(f"<b>Способ получения:</b> {safe(pickup_label)}")
+    if data.order.pickupType == "delivery" and data.order.deliveryAddress:
+        lines.append(
+         f"<b>Адрес доставки:</b> {safe(data.order.deliveryAddress)}"
+    )
     lines.append("")
 
     lines.append("<b>Состав заказа:</b>")
+
     for idx, item in enumerate(data.order.items, start=1):
-        line = f"{idx}. {item.name} × {item.quantity} = {int(item.total)} ₽"
+        line = (
+            f"{idx}. {safe(item.name)} × {item.quantity}"
+            f" = {int(item.total)} ₽"
+        )
         if item.category:
-            line += f" ({item.category})"
+            line += f" ({safe(item.category)})"
         lines.append(line)
 
     lines.append("")
+
     if data.order.comment:
         lines.append("<b>Комментарий:</b>")
-        lines.append(data.order.comment)
+        lines.append(safe(data.order.comment))
         lines.append("")
 
-    lines.append("<b>Итого:</b>")
-    lines.append(f"{data.order.totalCount} позиций / {int(data.order.totalPrice)} ₽")
+    lines.append("<b>Предварительная стоимость:</b>")
+    lines.append(
+        f"{data.order.totalCount} позиций / "
+        f"{int(data.order.totalPrice)} ₽"
+    )
+
+    if event and event.guestCount and event.guestCount > 0:
+        per_guest = data.order.totalPrice / event.guestCount
+        lines.append(f"Ориентировочно на гостя: {per_guest:.0f} ₽")
+
+    lines.append("")
+    lines.append("<i>Окончательная стоимость согласовывается с менеджером.</i>")
 
     return "\n".join(lines)
 
@@ -274,6 +340,20 @@ async def create_order(order: IncomingOrder, request: Request):
         raise HTTPException(status_code=400, detail="Не указан телефон")
     if not order.order.pickupType:
         raise HTTPException(status_code=400, detail="Не указан способ получения")
+
+    if order.order.pickupType not in ("delivery", "pickup"):
+        raise HTTPException(
+            status_code=400,
+            detail="Недопустимый способ получения заказа"
+        )
+
+    if order.order.pickupType == "delivery":
+        if not (order.order.deliveryAddress or "").strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Укажите адрес доставки"
+            )
+
 
     validate_order_totals(order)
     await enforce_order_rate_limit(_client_ip(request))

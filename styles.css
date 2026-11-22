@@ -1501,3 +1501,75 @@ button {
         font-size: 1.5rem;
     }
 }
+
+/* ===== Анкета мероприятия ===== */
+
+.event-section {
+    margin-bottom: 28px;
+    padding: 28px;
+    background: #f8f5ef;
+    border: 1px solid #e6dfd4;
+    border-radius: 18px;
+}
+
+.event-section h2 {
+    margin: 0 0 10px;
+    font-size: 26px;
+    color: #39352f;
+}
+
+.event-section>p {
+    margin: 0 0 24px;
+    color: #756d62;
+    line-height: 1.5;
+}
+
+.event-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 20px;
+}
+
+.event-form label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #39352f;
+}
+
+.event-form select,
+.event-form input {
+    width: 100%;
+    min-width: 0;
+    padding: 12px 14px;
+    border: 1px solid #d8cfc2;
+    border-radius: 10px;
+    background: #fff;
+    color: #39352f;
+    font: inherit;
+    box-sizing: border-box;
+}
+
+.event-form select:focus,
+.event-form input:focus {
+    outline: 2px solid #a88c68;
+    outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+    .event-section {
+        padding: 20px 16px;
+    }
+
+    .event-form {
+        grid-template-columns: 1fr;
+    }
+
+    .event-section h2 {
+        font-size: 22px;
+    }
+}
+
+/* Скрываем адрес доставки при самовывозе */
+#deliveryAddressField[hidden] {
+    display: none !important;
+}

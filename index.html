@@ -33,6 +33,44 @@
             </p>
           </section>
 
+          <!-- Анкета мероприятия -->
+          <section class="event-section" id="eventSection">
+            <h2>Расскажите о вашем мероприятии</h2>
+            <p>
+              Укажите основные параметры, и мы поможем подобрать меню для вашего
+              события.
+            </p>
+
+            <div class="event-form">
+              <label for="eventType">Тип мероприятия</label>
+              <select id="eventType" name="eventType">
+                <option value="">Выберите тип</option>
+                <option value="corporate">Корпоративное</option>
+                <option value="private">Частное</option>
+              </select>
+
+              <label for="eventFormat">Формат мероприятия</label>
+              <select id="eventFormat" name="eventFormat">
+                <option value="">Выберите формат</option>
+                <option value="buffet">Фуршет</option>
+                <option value="coffee-break">Кофе-брейк</option>
+                <option value="banquet">Банкет</option>
+              </select>
+
+              <label for="eventDate">Дата мероприятия</label>
+              <input type="date" id="eventDate" name="eventDate" />
+
+              <label for="guestCount">Количество гостей</label>
+              <input
+                type="number"
+                id="guestCount"
+                name="guestCount"
+                min="1"
+                placeholder="Например, 20"
+              />
+            </div>
+          </section>
+          <!-- Конец анкеты мероприятия -->
           <section class="categories-section">
             <h2>Категории</h2>
             <div class="categories-list" id="categoriesList">
@@ -124,14 +162,30 @@
 
               <label class="form-field">
                 <span>Способ получения *</span>
+
                 <select name="pickupType" id="pickupType" required>
-                  <option value="">Выберите вариант</option>
-                  <option value="in_cafe">В кафе</option>
-                  <option value="takeaway">С собой</option>
-                  <option value="preorder">Предзаказ ко времени</option>
+                  <option value="">Выберите способ получения</option>
+                  <option value="delivery">Доставка</option>
+                  <option value="pickup">Самовывоз</option>
                 </select>
               </label>
 
+              <!-- Адрес доставки -->
+              <label
+                class="form-field form-field--full"
+                id="deliveryAddressField"
+                hidden
+              >
+                <span>Адрес доставки</span>
+                <textarea
+                  name="deliveryAddress"
+                  id="deliveryAddress"
+                  rows="2"
+                  placeholder="Город, улица, дом, помещение, этаж"
+                ></textarea>
+              </label>
+
+              <!-- Комментарий к заказу -->
               <label class="form-field form-field--full">
                 <span>Комментарий к заказу</span>
                 <textarea

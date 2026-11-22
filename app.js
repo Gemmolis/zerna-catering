@@ -87,8 +87,7 @@ function showToast(message, timeout = 4000, subtitle = null) {
 }
 
 // TODO: заменить на реальный URL бэкенда (твой ngrok)
-const ORDER_WEBHOOK_URL =
-  "https://rewrite-heritage-void.ngrok-free.dev/api/orders/from-site";
+const ORDER_WEBHOOK_URL = "http://127.0.0.1:8000/api/orders/from-site";
 
 let menuData = [];
 let categoriesData = [];
@@ -117,6 +116,85 @@ function saveCartToStorage() {
     console.error("Ошибка сохранения корзины:", e);
   }
 }
+
+/* ===== Анкета мероприятия ===== */
+
+const eventFieldIds = ["eventType", "eventFormat", "eventDate", "guestCount"];
+
+function saveEventToStorage() {
+  const eventData = {};
+
+  eventFieldIds.forEach((id) => {
+    const field = document.getElementById(id);
+    if (field) {
+      eventData[id] = field.value;
+    }
+  });
+
+  try {
+    localStorage.setItem("zerna_event", JSON.stringify(eventData));
+  } catch (error) {
+    console.error("Ошибка сохранения мероприятия:", error);
+  }
+}
+
+function loadEventFromStorage() {
+  try {
+    const saved = localStorage.getItem("zerna_event");
+    if (!saved) return;
+
+    const eventData = JSON.parse(saved);
+
+    eventFieldIds.forEach((id) => {
+      const field = document.getElementById(id);
+      if (field && typeof eventData[id] === "string") {
+        field.value = eventData[id];
+      }
+    });
+  } catch (error) {
+    console.error("Ошибка загрузки мероприятия:", error);
+  }
+}
+
+function initEventForm() {
+  loadEventFromStorage();
+
+  eventFieldIds.forEach((id) => {
+    const field = document.getElementById(id);
+
+    if (field) {
+      field.addEventListener("change", saveEventToStorage);
+      field.addEventListener("input", saveEventToStorage);
+    }
+  });
+}
+
+function initDeliveryAddress() {
+  const pickupType = document.getElementById("pickupType");
+  const addressField = document.getElementById("deliveryAddressField");
+  const addressInput = document.getElementById("deliveryAddress");
+
+  if (!pickupType || !addressField || !addressInput) return;
+
+  function updateDeliveryAddress() {
+    const isDelivery = pickupType.value === "delivery";
+
+    addressField.hidden = !isDelivery;
+    addressInput.required = isDelivery;
+
+    if (!isDelivery) {
+      addressInput.value = "";
+    }
+  }
+
+  pickupType.addEventListener("change", updateDeliveryAddress);
+  updateDeliveryAddress();
+}
+
+initEventForm();
+initDeliveryAddress();
+
+/* ===== Конец анкеты мероприятия ===== */
 
 // --- Вспомогательные функции ---
 function formatPrice(value) {
@@ -578,11 +656,26 @@ function setFormStatus(message = "", type = "") {
   }
 }
 
+function getEventFormData() {
+  return {
+    type: document.getElementById("eventType")?.value || "",
+    format: document.getElementById("eventFormat")?.value || "",
+    date: document.getElementById("eventDate")?.value || "",
+    guestCount: Number(document.getElementById("guestCount")?.value || 0),
+  };
+}
+
 function getOrderFormData() {
   const name = document.getElementById("orderName")?.value.trim() || "";
   const phone = document.getElementById("phone")?.value.trim() || "";
   const vk = document.getElementById("orderVk")?.value.trim() || "";
   const pickupType = document.getElementById("pickupType")?.value || "";
+
+  const deliveryAddress =
+    pickupType === "delivery"
+      ? document.getElementById("deliveryAddress")?.value.trim() || ""
+      : "";
+
   const comment = document.getElementById("orderComment")?.value.trim() || "";
   const policyAccepted =
     document.getElementById("orderPolicy")?.checked || false;
@@ -593,9 +686,10 @@ function getOrderFormData() {
     customer: { name, phone, vk },
     order: {
       pickupType,
+      deliveryAddress,
       comment,
       items: cart.map((item) => ({
-        id: item.originalId || item.id, // Отправляем числовой ID бэкенду
+        id: String(item.originalId ?? item.id),
         name: item.name,
         category: item.category,
         price: item.price,
@@ -604,6 +698,7 @@ function getOrderFormData() {
       })),
       totalCount: totals.totalCount,
       totalPrice: totals.totalPrice,
+      event: getEventFormData(),
     },
     consents: { policyAccepted, vkNotify },
     meta: { source: "website" },
@@ -668,6 +763,10 @@ async function submitOrder(orderData) {
   }
 
   if (!response.ok) {
+    console.error("Ошибка API:", response.status);
+    console.error("Ответ FastAPI:", result);
+    console.error("Отправленные данные:", orderData);
+
     throw new Error(getApiErrorMessage(result, response.status));
   }
   return result;
