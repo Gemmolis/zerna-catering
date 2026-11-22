@@ -6,6 +6,10 @@ const cartItems = document.getElementById("cartItems");
 const cartCount = document.getElementById("cartCount");
 const cartTotalCount = document.getElementById("cartTotalCount");
 const cartTotalPrice = document.getElementById("cartTotalPrice");
+
+const cartGuestCount = document.getElementById("cartGuestCount");
+const cartPricePerGuest = document.getElementById("cartPricePerGuest");
+
 const clearCartBtn = document.getElementById("clearCartBtn");
 const checkoutBtn = document.getElementById("checkoutBtn");
 const mobileCartBtn = document.getElementById("mobileCartBtn");
@@ -165,6 +169,11 @@ function initEventForm() {
     if (field) {
       field.addEventListener("change", saveEventToStorage);
       field.addEventListener("input", saveEventToStorage);
+
+      if (id === "guestCount") {
+        field.addEventListener("input", renderCart);
+        field.addEventListener("change", renderCart);
+      }
     }
   });
 }
@@ -575,6 +584,23 @@ function renderCart() {
   if (cartCount) cartCount.textContent = totalCount;
   if (cartTotalCount) cartTotalCount.textContent = totalCount;
   if (cartTotalPrice) cartTotalPrice.textContent = formatPrice(totalPrice);
+
+  const guestCount = Number(document.getElementById("guestCount")?.value) || 0;
+
+  if (cartGuestCount) {
+    cartGuestCount.textContent = guestCount > 0 ? guestCount : "—";
+  }
+
+  if (cartPricePerGuest) {
+    cartPricePerGuest.textContent =
+      guestCount > 0 && totalCount > 0
+        ? `${(totalPrice / guestCount).toLocaleString("ru-RU", {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+          })} ₽`
+        : "—";
+  }
+
   if (mobileCartBtn) {
     mobileCartBtn.textContent = totalCount
       ? `Корзина · ${formatPrice(totalPrice)}`

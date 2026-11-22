@@ -598,6 +598,29 @@ button {
     margin: 0;
 }
 
+/* Предварительная стоимость кейтеринга */
+
+.cart-summary p:has(#cartPricePerGuest) {
+    background: #f8f3eb;
+    border: 1px solid #e8dccb;
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 4px;
+}
+
+#cartPricePerGuest {
+    font-weight: 700;
+    white-space: nowrap;
+    color: #77512d;
+}
+
+.cart-summary__note {
+    display: block;
+    color: #77716b;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 /* =========================================
    8. ФОРМА ОФОРМЛЕНИЯ
    ========================================= */
