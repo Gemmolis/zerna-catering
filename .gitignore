@@ -1,0 +1,39 @@
+vk_secrets.env
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Локальный журнал заказов (персональные данные)
+data/orders_log.jsonl
+venv/
+__pycache__/
+.env
+vk_secrets.env
+*.log
+orders_log.jsonl
+
+
+# Секреты и настройки
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Локальные базы данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Локальные файлы заказов
+*.jsonl
+
+# Системные файлы
+.DS_Store
+Thumbs.db
