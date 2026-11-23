@@ -19,7 +19,24 @@ from pydantic import BaseModel, Field
 
 app = FastAPI(title="Cafe Orders API")
 
+MENU_PATH = Path(__file__).resolve().parent / "data" / "menu.json"
 
+
+def load_menu_prices() -> dict[int, float]:
+    """Загружает актуальные цены из каталога кейтеринга."""
+    try:
+        with MENU_PATH.open("r", encoding="utf-8") as file:
+            menu = json.load(file)
+
+        return {
+            int(item["id"]): float(item["price"])
+            for item in menu["items"]
+        }
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Не удалось загрузить каталог товаров"
+        ) from exc
 def load_secrets_from_file(filename: str = "vk_secrets.env") -> None:
     """
     Читает KEY=VALUE из файла рядом с main.py и подставляет в os.environ.
@@ -323,18 +340,73 @@ async def send_telegram_message(chat_id: str, text: str) -> None:
 
 
 def validate_order_totals(order: IncomingOrder) -> None:
-    """Сверка суммы и количества с позициями."""
+    """Проверяет количество и стоимость заказа по серверному каталогу."""
+    menu_prices = load_menu_prices()
     items = order.order.items
-    computed_count = sum(i.quantity for i in items)
-    computed_price = sum(float(i.price) * int(i.quantity) for i in items)
+
+    computed_count = 0
+    computed_price = 0.0
+
+    for item in items:
+        # Поддерживаем обычные ID и составные ID с модификаторами.
+        product_id_str = str(item.id).split("_")[0]
+
+        try:
+            product_id = int(product_id_str)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Некорректный ID товара: {item.id}"
+            )
+
+        if product_id not in menu_prices:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Товар отсутствует в каталоге: {item.name}"
+            )
+
+        if "_" in str(item.id):
+            raise HTTPException(
+                status_code=400,
+                detail="Товары с модификаторами пока не поддерживаются"
+            )
+
+        if item.quantity <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Некорректное количество товара: {item.name}"
+            )
+
+        actual_price = menu_prices[product_id]
+
+        if abs(float(item.price) - actual_price) > 0.02:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Цена товара не совпадает с каталогом: {item.name}"
+            )
+
+        expected_total = actual_price * item.quantity
+
+        if abs(float(item.total) - expected_total) > 0.02:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Неверная сумма по позиции: {item.name}"
+            )
+
+        computed_count += item.quantity
+        computed_price += expected_total
+
     if computed_count != order.order.totalCount:
-        raise HTTPException(status_code=400, detail="Неверное количество позиций в заказе")
+        raise HTTPException(
+            status_code=400,
+            detail="Неверное количество позиций в заказе"
+        )
+
     if abs(computed_price - float(order.order.totalPrice)) > 0.02:
-        raise HTTPException(status_code=400, detail="Неверная сумма заказа")
-    for i in items:
-        expected = float(i.price) * int(i.quantity)
-        if abs(expected - float(i.total)) > 0.02:
-            raise HTTPException(status_code=400, detail=f"Неверная сумма по позиции: {i.name}")
+        raise HTTPException(
+            status_code=400,
+            detail="Неверная сумма заказа"
+        )
 
 
 # ===== Основной endpoint для сайта =====
