@@ -529,7 +529,7 @@ function addToCart(itemId, modifiers = []) {
   }
 
   renderCart();
-  openCart();
+  showToast("Добавлено в корзину", 2000, product.name);
 }
 
 function increaseCartItem(itemId) {
