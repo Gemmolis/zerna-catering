@@ -163,6 +163,21 @@ function loadEventFromStorage() {
 function initEventForm() {
   loadEventFromStorage();
 
+  // Запрещаем выбирать прошедшие даты
+  const eventDateInput = document.getElementById("eventDate");
+
+  if (eventDateInput) {
+    const today = new Date();
+
+    const todayString = [
+      today.getFullYear(),
+      String(today.getMonth() + 1).padStart(2, "0"),
+      String(today.getDate()).padStart(2, "0"),
+    ].join("-");
+
+    eventDateInput.min = todayString;
+  }
+
   eventFieldIds.forEach((id) => {
     const field = document.getElementById(id);
 
@@ -853,6 +868,47 @@ function bindStaticActions() {
 
       const orderData = getOrderFormData();
 
+      // Проверяем дату мероприятия
+      const eventDate = orderData.order.event?.date;
+
+      if (!eventDate) {
+        showToast(
+          "Не указана дата мероприятия",
+          6000,
+          "Пожалуйста, выберите дату проведения мероприятия.",
+        );
+        document.getElementById("eventDate")?.focus();
+        return;
+      }
+
+      const today = new Date();
+      const todayString = [
+        today.getFullYear(),
+        String(today.getMonth() + 1).padStart(2, "0"),
+        String(today.getDate()).padStart(2, "0"),
+      ].join("-");
+
+      if (eventDate < todayString) {
+        showToast(
+          "Неверная дата мероприятия",
+          6000,
+          "Выберите сегодняшнюю или будущую дату.",
+        );
+        document.getElementById("eventDate")?.focus();
+        return;
+      }
+      // Проверяем количество гостей
+      const guestCount = Number(orderData.order.event?.guestCount);
+
+      if (!Number.isInteger(guestCount) || guestCount < 1) {
+        showToast(
+          "Неверное количество гостей",
+          6000,
+          "Укажите целое число гостей, не меньше 1.",
+        );
+        document.getElementById("guestCount")?.focus();
+        return;
+      }
       if (
         !orderData.customer.name ||
         !orderData.customer.phone ||

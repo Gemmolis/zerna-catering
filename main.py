@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
 import html
+from datetime import date
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -68,11 +69,21 @@ class Customer(BaseModel):
     vk: Optional[str] = None
 
 
+
 class EventData(BaseModel):
     type: Optional[str] = None
     format: Optional[str] = None
-    date: Optional[str] = None
-    guestCount: Optional[int] = None
+    date: date
+    guestCount: int = Field(..., ge=1)
+
+
+def validate_event_date(event: EventData):
+    if event.date < date.today():
+        raise HTTPException(
+            status_code=400,
+            detail="Дата мероприятия не может быть в прошлом"
+        )
+
 
 class OrderData(BaseModel):
     pickupType: str = Field(..., description="delivery / pickup")
@@ -354,6 +365,14 @@ async def create_order(order: IncomingOrder, request: Request):
                 detail="Укажите адрес доставки"
             )
 
+    # Проверяем дату мероприятия
+    if order.order.event is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Не указаны данные мероприятия"
+        )
+
+    validate_event_date(order.order.event)
 
     validate_order_totals(order)
     await enforce_order_rate_limit(_client_ip(request))
