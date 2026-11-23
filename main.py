@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 import html
 from datetime import date
+from dotenv import load_dotenv
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
@@ -16,6 +17,8 @@ from fastapi import FastAPI, HTTPException, Request
 from yandex_disk_upload import upload_order_json as yandex_upload_order_json
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+load_dotenv()
 
 app = FastAPI(title="Cafe Orders API")
 
@@ -326,7 +329,6 @@ async def send_telegram_message(chat_id: str, text: str) -> None:
         "text": text,
         "parse_mode": "HTML"  # Разрешает использовать жирный шрифт
     }
-    
     async with httpx.AsyncClient(timeout=10) as client:
         try:
             resp = await client.post(url, json=payload)
@@ -469,7 +471,7 @@ async def create_order(order: IncomingOrder, request: Request):
 
     print("\n[NEW ORDER]")
     print("ID:", order_id)
-    print(json.dumps(order.model_dump(), indent=2, ensure_ascii=False))
+    print(json.dumps(order.model_dump(mode="json"), indent=2, ensure_ascii=False))
     print("[/NEW ORDER]\n")
 
     admin_text = build_admin_message(order_id, order)
