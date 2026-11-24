@@ -91,7 +91,7 @@ function showToast(message, timeout = 4000, subtitle = null) {
 }
 
 // TODO: заменить на реальный URL бэкенда (твой ngrok)
-const ORDER_WEBHOOK_URL = "http://127.0.0.1:8000/api/orders/from-site";
+const ORDER_WEBHOOK_URL = "/api/orders/from-site";
 
 let menuData = [];
 let categoriesData = [];

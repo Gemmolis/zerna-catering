@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 
 from yandex_disk_upload import upload_order_json as yandex_upload_order_json
 from fastapi.middleware.cors import CORSMiddleware
@@ -29,6 +30,27 @@ app = FastAPI(
 
 MENU_PATH = Path(__file__).resolve().parent / "data" / "menu.json"
 
+BASE_DIR = Path(__file__).resolve().parent
+
+
+@app.get("/")
+async def home_page():
+    return FileResponse(BASE_DIR / "index.html")
+
+
+@app.get("/styles.css")
+async def site_styles():
+    return FileResponse(BASE_DIR / "styles.css")
+
+
+@app.get("/app.js")
+async def site_script():
+    return FileResponse(BASE_DIR / "app.js")
+
+
+@app.get("/data/menu.json")
+async def site_menu():
+    return FileResponse(MENU_PATH)
 
 def load_menu_prices() -> dict[int, float]:
     """Загружает актуальные цены из каталога кейтеринга."""
