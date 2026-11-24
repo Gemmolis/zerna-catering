@@ -11,6 +11,7 @@ import html
 from datetime import date
 from dotenv import load_dotenv
 
+from uuid import uuid4
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -185,7 +186,12 @@ YANDEX_DISK_FOLDER = os.getenv("YANDEX_DISK_FOLDER", "zerna-cafe-orders").strip(
 # ===== Запись заказов на диск =====
 DATA_DIR = Path(__file__).resolve().parent / "data"
 ORDERS_LOG_PATH = DATA_DIR / "orders_log.jsonl"
+TELEGRAM_SENT_PATH = DATA_DIR / "telegram_sent.jsonl"
+
 _orders_write_lock = asyncio.Lock()
+_telegram_send_lock = asyncio.Lock()
+
+TELEGRAM_RETRY_INTERVAL = 60
 
 # ===== Лимит POST /api/orders по IP =====
 _rate_lock = asyncio.Lock()
@@ -240,11 +246,37 @@ async def persist_order_to_file(order_id: str, order: IncomingOrder) -> None:
             detail="Не удалось сохранить заказ. Попробуйте через минуту или позвоните в кафе.",
         ) from exc
 
+def load_telegram_sent_ids() -> set[str]:
+    """Загружает номера успешно отправленных заявок."""
+    if not TELEGRAM_SENT_PATH.exists():
+        return set()
+
+    sent_ids = set()
+
+    with open(TELEGRAM_SENT_PATH, "r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                record = json.loads(line)
+                sent_ids.add(record["orderId"])
+
+    return sent_ids
+
+
+def mark_telegram_sent(order_id: str) -> None:
+    """Сохраняет подтверждение отправки уведомления."""
+    record = {
+        "orderId": order_id,
+        "sent_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    with open(TELEGRAM_SENT_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 def generate_order_id() -> str:
-    """Генерируем ID заказа вида RZ-YYYYMMDD-HHMMSS."""
+    """Генерирует номер заказа с уникальным суффиксом."""
     now = datetime.now()
-    return now.strftime("RZ-%Y%m%d-%H%M%S")
+    suffix = uuid4().hex[:8].upper()
+    return f"RZ-{now:%Y%m%d-%H%M%S}-{suffix}"
 
 
 
@@ -344,29 +376,128 @@ def build_admin_message(order_id: str, data: IncomingOrder) -> str:
     return "\n".join(lines)
 
 
-async def send_telegram_message(chat_id: str, text: str) -> None:
-    """Отправляет сообщение в Telegram через Bot API."""
+async def send_telegram_message(chat_id: str, text: str) -> bool:
+    """Отправляет сообщение в Telegram и возвращает результат."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
-        print("[INFO] Telegram токен или ID админа не заданы, уведомление не отправлено.")
-        return
+        print("[INFO] Telegram не настроен.")
+        return False
 
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "HTML"  # Разрешает использовать жирный шрифт
+        "parse_mode": "HTML"
     }
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(url, json=payload)
             data = resp.json()
-            if not data.get("ok"):
-                print("[TELEGRAM ERROR] HTTP:", resp.status_code)
-            else:
-                print("[TELEGRAM] Уведомление успешно отправлено админу.")
-        except Exception as exc:
-            print("[TELEGRAM SEND ERROR]", type(exc).__name__)
 
+            if resp.status_code == 200 and data.get("ok"):
+                print("[TELEGRAM] Уведомление успешно отправлено.")
+                return True
+
+            print("[TELEGRAM ERROR] HTTP:", resp.status_code)
+            return False
+
+    except Exception as exc:
+        print("[TELEGRAM SEND ERROR]", type(exc).__name__)
+        return False
+
+async def notify_order_once(order_id: str, text: str) -> bool:
+    """Отправляет уведомление, если оно ещё не было отправлено."""
+    async with _telegram_send_lock:
+        try:
+            sent_ids = await asyncio.to_thread(load_telegram_sent_ids)
+
+            if order_id in sent_ids:
+                return True
+
+            success = await send_telegram_message(
+                ADMIN_TELEGRAM_ID, text
+            )
+
+            if success:
+                await asyncio.to_thread(
+                    mark_telegram_sent, order_id
+                )
+
+            return success
+
+        except Exception as exc:
+            print("[NOTIFICATION ERROR]", type(exc).__name__)
+            return False
+async def retry_pending_notifications():
+    """Повторяет отправку недоставленных уведомлений."""
+    while True:
+        await asyncio.sleep(TELEGRAM_RETRY_INTERVAL)
+
+        try:
+            if not TELEGRAM_SENT_PATH.exists():
+                continue
+
+            if not ORDERS_LOG_PATH.exists():
+                continue
+
+            async with _orders_write_lock:
+                content = await asyncio.to_thread(
+                    ORDERS_LOG_PATH.read_text,
+                    encoding="utf-8"
+                )
+
+            sent_ids = await asyncio.to_thread(
+                load_telegram_sent_ids
+            )
+
+            for line in content.splitlines():
+                if not line.strip():
+                    continue
+
+                try:
+                    record = json.loads(line)
+                    order_id = record["orderId"]
+
+                    if order_id in sent_ids:
+                        continue
+
+                    order = IncomingOrder.model_validate(
+                        record["payload"]
+                    )
+
+                    text = build_admin_message(order_id, order)
+
+                    success = await notify_order_once(
+                        order_id, text
+                    )
+
+                    if not success:
+                        break
+
+                except Exception as exc:
+                    print("[RETRY ORDER ERROR]", type(exc).__name__)
+
+        except Exception as exc:
+            print("[RETRY ERROR]", type(exc).__name__)
+
+
+@app.on_event("startup")
+async def start_notification_worker():
+    app.state.notification_worker = asyncio.create_task(
+        retry_pending_notifications()
+    )
+
+
+@app.on_event("shutdown")
+async def stop_notification_worker():
+    task = app.state.notification_worker
+    task.cancel()
+
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass        
 
 def validate_order_totals(order: IncomingOrder) -> None:
     """Проверяет количество и стоимость заказа по серверному каталогу."""
@@ -481,7 +612,7 @@ async def create_order(order: IncomingOrder, request: Request):
     # 2. Генерируем ID
     order_id = generate_order_id()
 
-    # 3. Сохраняем заказ в файл
+        # 3. Сохраняем заказ в файл
     await persist_order_to_file(order_id, order)
 
     if YANDEX_DISK_TOKEN:
@@ -500,11 +631,13 @@ async def create_order(order: IncomingOrder, request: Request):
 
     admin_text = build_admin_message(order_id, order)
 
-    # 4. Отправляем уведомление в Telegram
-    try:
-        await send_telegram_message(ADMIN_TELEGRAM_ID, admin_text)
-    except Exception as exc:
-        print("[TG SEND ERROR]", type(exc).__name__)
+    # 4. Отправляем уведомление с учётом статуса
+    notification_sent = await notify_order_once(
+        order_id, admin_text
+    )
+
+    if not notification_sent:
+        print(f"[TELEGRAM PENDING] ID: {order_id}")
 
     return OutgoingResponse(
         status="success",
