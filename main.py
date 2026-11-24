@@ -234,7 +234,7 @@ async def persist_order_to_file(order_id: str, order: IncomingOrder) -> None:
         async with _orders_write_lock:
             await asyncio.to_thread(_append_order_line_sync, order_id, payload)
     except OSError as exc:
-        print("[ORDER LOG ERROR]", exc)
+        print("[ORDER LOG ERROR]", type(exc).__name__)
         raise HTTPException(
             status_code=503,
             detail="Не удалось сохранить заказ. Попробуйте через минуту или позвоните в кафе.",
@@ -361,11 +361,11 @@ async def send_telegram_message(chat_id: str, text: str) -> None:
             resp = await client.post(url, json=payload)
             data = resp.json()
             if not data.get("ok"):
-                print("[TELEGRAM ERROR]", data)
+                print("[TELEGRAM ERROR] HTTP:", resp.status_code)
             else:
                 print("[TELEGRAM] Уведомление успешно отправлено админу.")
         except Exception as exc:
-            print("[TELEGRAM SEND ERROR]", exc)
+            print("[TELEGRAM SEND ERROR]", type(exc).__name__)
 
 
 def validate_order_totals(order: IncomingOrder) -> None:
@@ -494,12 +494,9 @@ async def create_order(order: IncomingOrder, request: Request):
             )
             print(f"[YANDEX DISK] Заказ {order_id} загружен в папку «{YANDEX_DISK_FOLDER}»")
         except Exception as exc:
-            print("[YANDEX DISK ERROR]", repr(exc))
+            print("[YANDEX DISK ERROR]", type(exc).__name__)
 
-    print("\n[NEW ORDER]")
-    print("ID:", order_id)
-    print(json.dumps(order.model_dump(mode="json"), indent=2, ensure_ascii=False))
-    print("[/NEW ORDER]\n")
+    print(f"[NEW ORDER] ID: {order_id}")
 
     admin_text = build_admin_message(order_id, order)
 
@@ -507,7 +504,7 @@ async def create_order(order: IncomingOrder, request: Request):
     try:
         await send_telegram_message(ADMIN_TELEGRAM_ID, admin_text)
     except Exception as exc:
-        print("[TG SEND ERROR]", exc)
+        print("[TG SEND ERROR]", type(exc).__name__)
 
     return OutgoingResponse(
         status="success",
