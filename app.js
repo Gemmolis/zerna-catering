@@ -338,6 +338,73 @@ function renderCategories() {
     .join("");
 }
 
+function getProductCartQuantity(productId) {
+  return cart.reduce((sum, item) => {
+    const originalId = item.originalId ?? item.id;
+
+    return String(originalId) === String(productId)
+      ? sum + item.quantity
+      : sum;
+  }, 0);
+}
+
+function renderProductCartControl(productId) {
+  const quantity = getProductCartQuantity(productId);
+
+  if (quantity === 0) {
+    return `
+      <button class="primary-btn add-btn"
+        type="button" data-add-id="${productId}">
+        Добавить
+      </button>
+    `;
+  }
+
+  return `
+    <div class="menu-stepper">
+      <button type="button"
+        data-menu-minus="${productId}"
+        aria-label="Уменьшить количество">−</button>
+
+      <span class="menu-stepper__value">
+        <strong>${quantity} шт.</strong>
+        <small>В корзине</small>
+      </span>
+
+      <button type="button"
+        data-add-id="${productId}"
+        aria-label="Увеличить количество">+</button>
+    </div>
+  `;
+}
+
+function updateMenuCartControls() {
+  if (!menuGrid) return;
+
+  menuGrid.querySelectorAll("[data-cart-control]").forEach((element) => {
+    const productId = Number(element.dataset.cartControl);
+    const quantity = getProductCartQuantity(productId);
+
+    if (element.dataset.quantity === String(quantity)) return;
+
+    element.innerHTML = renderProductCartControl(productId);
+    element.dataset.quantity = String(quantity);
+  });
+}
+
+function decreaseProductFromMenu(productId) {
+  const matchingItems = cart.filter(
+    (item) =>
+      String(item.originalId ?? item.id) === String(productId)
+  );
+
+  const item =
+    matchingItems.find((item) => item.id === String(productId)) ||
+    matchingItems[matchingItems.length - 1];
+
+  if (item) decreaseCartItem(item.id);
+}
+
 function renderMenu(items) {
   if (!menuGrid) return;
   if (!items.length) {
@@ -364,7 +431,11 @@ function renderMenu(items) {
               <p class="menu-card__price">${formatPrice(item.price)}</p>
               <div class="menu-card__actions">
                 <button class="secondary-btn details-btn" type="button" data-id="${item.id}">Подробнее</button>
-                <button class="primary-btn add-btn" type="button" data-add-id="${item.id}">Добавить</button>
+                <div class="menu-cart-control"
+                  data-cart-control="${item.id}"
+                  data-quantity="${getProductCartQuantity(item.id)}">
+                  ${renderProductCartControl(item.id)}
+                </div>
               </div>
             </div>
           </div>
@@ -566,9 +637,26 @@ function getCartTotals() {
 function renderCart() {
   const { totalCount, totalPrice } = getCartTotals();
   if (!cartItems) return;
+    if (checkoutForm) {
+    checkoutForm.hidden = cart.length === 0;
+  }
+
+  if (clearCartBtn) {
+    clearCartBtn.hidden = cart.length === 0;
+  }
 
   if (!cart.length) {
-    cartItems.innerHTML = `<div class="cart-empty"><p>Пока пусто. Добавьте блюда из меню.</p></div>`;
+    cartItems.innerHTML = `
+  <div class="cart-empty">
+    <p>Ваша корзина пока пуста.</p>
+    <button type="button" class="primary-btn" id="returnToMenuBtn">
+      Перейти к меню
+    </button>
+  </div>
+`;
+
+document.getElementById("returnToMenuBtn")
+  ?.addEventListener("click", closeCart);
   } else {
     cartItems.innerHTML = cart
       .map((item) => {
@@ -624,6 +712,7 @@ function renderCart() {
 
   saveCartToStorage();
   bindCartItemActions();
+  updateMenuCartControls();
 }
 
 function bindCategoryActions() {
@@ -640,24 +729,31 @@ function bindCategoryActions() {
 }
 
 function bindMenuActions() {
-  const addButtons = document.querySelectorAll("[data-add-id]");
-  const detailsButtons = document.querySelectorAll(".details-btn");
+  if (!menuGrid) return;
 
-  addButtons.forEach((button) => {
-    button.addEventListener("click", () => {
+  menuGrid.onclick = (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+
+    if (button.hasAttribute("data-add-id")) {
       addToCart(Number(button.dataset.addId));
-    });
-  });
+      return;
+    }
 
-  detailsButtons.forEach((button) => {
-    button.addEventListener("click", () => {
+    if (button.hasAttribute("data-menu-minus")) {
+      decreaseProductFromMenu(Number(button.dataset.menuMinus));
+      return;
+    }
+
+    if (button.classList.contains("details-btn")) {
       const itemId = Number(button.dataset.id);
-      const item = menuData.find((product) => product.id === itemId);
-      if (item) {
-        openProductModal(item);
-      }
-    });
-  });
+      const item = menuData.find(
+        (product) => product.id === itemId
+      );
+
+      if (item) openProductModal(item);
+    }
+  };
 }
 
 function bindCartItemActions() {
@@ -805,8 +901,7 @@ async function submitOrder(orderData) {
 
   if (!response.ok) {
     console.error("Ошибка API:", response.status);
-    console.error("Ответ FastAPI:", result);
-    console.error("Отправленные данные:", orderData);
+ 
 
     throw new Error(getApiErrorMessage(result, response.status));
   }
@@ -935,19 +1030,24 @@ function bindStaticActions() {
       try {
         setFormStatus("Отправляем заказ...", "");
         const result = await submitOrder(orderData);
-        setFormStatus("", "");
-        showOrderSuccess(result);
+
+        resetOrderFlow();
+
         showToast(
-          "Спасибо за заказ!",
-          6000,
-          "Мы свяжемся с Вами для подтверждения.",
+          "Заказ успешно принят!",
+          12000,
+          `Номер заявки: ${result.orderId || "уточнит менеджер"}. Мы свяжемся с вами для подтверждения.`,
         );
-      } catch (error) {
+        } catch (error) {
         console.error(error);
-        setFormStatus(
-          error.message || "Не удалось отправить заказ. Попробуйте ещё раз.",
-          "error",
-        );
+
+        const message = error instanceof TypeError
+          ? "Не удалось связаться с сервером. Проверьте интернет-соединение. Данные заказа сохранены."
+          : error.message || "Не удалось отправить заказ. Попробуйте ещё раз.";
+
+        setFormStatus(message, "error");
+        showToast("Ошибка отправки", 8000, message);
+        
       } finally {
         orderSubmitInFlight = false;
         if (checkoutForm && !checkoutForm.hidden) setSubmitOrderLoading(false);
