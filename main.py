@@ -20,7 +20,12 @@ from pydantic import BaseModel, Field
 
 load_dotenv()
 
-app = FastAPI(title="Cafe Orders API")
+app = FastAPI(
+    title="Zerna Catering API",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None
+)
 
 MENU_PATH = Path(__file__).resolve().parent / "data" / "menu.json"
 
