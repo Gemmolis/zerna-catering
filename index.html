@@ -34,8 +34,18 @@
           </section>
 
           <!-- Анкета мероприятия -->
-          <section class="event-section" id="eventSection">
-            <h2>Расскажите о вашем мероприятии</h2>
+          <details class="event-section" id="eventSection" open>
+            <summary class="event-summary">
+              <span class="event-summary__content">
+                <strong>Ваше мероприятие</strong>
+                <span id="eventSummaryText">
+                  Укажите параметры мероприятия
+                </span>
+              </span>
+              <span class="event-summary__arrow" aria-hidden="true"></span>
+            </summary>
+            <div class="event-details">
+            
             <p>
               Укажите основные параметры, и мы поможем подобрать меню для вашего
               события.
@@ -72,7 +82,8 @@
                 placeholder="Например, 20"
               />
             </div>
-          </section>
+            </div>
+          </details>
           <!-- Конец анкеты мероприятия -->
           <section class="categories-section">
             <h2>Категории</h2>
@@ -84,7 +95,7 @@
           <section class="menu-section">
             <div class="section-head">
               <h2>Меню</h2>
-              <p>Карточки адаптируются под ширину экрана</p>
+            
             </div>
 
             <div class="menu-grid" id="menuGrid">

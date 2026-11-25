@@ -160,8 +160,72 @@ function loadEventFromStorage() {
   }
 }
 
+function updateEventSummary() {
+  const summary = document.getElementById("eventSummaryText");
+  if (!summary) return;
+
+  const parts = [];
+
+  const type = document.getElementById("eventType");
+  const format = document.getElementById("eventFormat");
+  const date = document.getElementById("eventDate");
+  const guests = document.getElementById("guestCount");
+
+  if (type?.value) {
+    parts.push(type.options[type.selectedIndex].text);
+  }
+
+  if (format?.value) {
+    parts.push(format.options[format.selectedIndex].text);
+  }
+
+  if (date?.value) {
+    const [year, month, day] = date.value.split("-");
+    parts.push(`${day}.${month}.${year}`);
+  }
+
+  const count = Number(guests?.value);
+
+  if (Number.isInteger(count) && count > 0) {
+    parts.push(`Гостей: ${count}`);
+  }
+
+  summary.textContent = parts.length
+    ? parts.join(" · ")
+    : "Укажите параметры мероприятия";
+}
+
+function focusEventField(fieldId) {
+  const section = document.getElementById("eventSection");
+  if (section) section.open = true;
+
+  closeCart();
+
+  requestAnimationFrame(() => {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+
+    field.scrollIntoView({
+      block: "center",
+      behavior: "auto"
+    });
+
+    field.focus();
+  });
+}
+
 function initEventForm() {
   loadEventFromStorage();
+
+  const eventSection = document.getElementById("eventSection");
+
+  if (eventSection) {
+    eventSection.open = !window.matchMedia(
+      "(max-width: 768px), (max-height: 500px) and (orientation: landscape)"
+    ).matches;
+  }
+
+  updateEventSummary();
 
   // Запрещаем выбирать прошедшие даты
   const eventDateInput = document.getElementById("eventDate");
@@ -184,6 +248,8 @@ function initEventForm() {
     if (field) {
       field.addEventListener("change", saveEventToStorage);
       field.addEventListener("input", saveEventToStorage);
+      field.addEventListener("input", updateEventSummary);
+      field.addEventListener("change", updateEventSummary);
 
       if (id === "guestCount") {
         field.addEventListener("input", renderCart);
@@ -656,7 +722,28 @@ function renderCart() {
 `;
 
 document.getElementById("returnToMenuBtn")
-  ?.addEventListener("click", closeCart);
+  ?.addEventListener("click", () => {
+    closeCart();
+
+    requestAnimationFrame(() => {
+      const menu = document.getElementById("menuGrid");
+      if (!menu) return;
+
+      const header = document.querySelector(".site-header");
+      const headerHeight = header?.offsetHeight || 0;
+
+      const targetPosition =
+        menu.getBoundingClientRect().top +
+        window.scrollY -
+        headerHeight -
+        12;
+
+      window.scrollTo({
+        top: Math.max(0, targetPosition),
+        behavior: "smooth"
+      });
+    });
+  });
   } else {
     cartItems.innerHTML = cart
       .map((item) => {
@@ -972,7 +1059,7 @@ function bindStaticActions() {
           6000,
           "Пожалуйста, выберите дату проведения мероприятия.",
         );
-        document.getElementById("eventDate")?.focus();
+        focusEventField("eventDate");
         return;
       }
 
@@ -989,7 +1076,7 @@ function bindStaticActions() {
           6000,
           "Выберите сегодняшнюю или будущую дату.",
         );
-        document.getElementById("eventDate")?.focus();
+        focusEventField("eventDate");
         return;
       }
       // Проверяем количество гостей
@@ -1001,7 +1088,7 @@ function bindStaticActions() {
           6000,
           "Укажите целое число гостей, не меньше 1.",
         );
-        document.getElementById("guestCount")?.focus();
+        focusEventField("guestCount");
         return;
       }
       if (
@@ -1047,7 +1134,7 @@ function bindStaticActions() {
 
         setFormStatus(message, "error");
         showToast("Ошибка отправки", 8000, message);
-        
+
       } finally {
         orderSubmitInFlight = false;
         if (checkoutForm && !checkoutForm.hidden) setSubmitOrderLoading(false);
