@@ -1199,6 +1199,10 @@ function initCompactHeader() {
     "(max-width: 768px)"
   );
 
+  const landscape = window.matchMedia(
+    "(orientation: landscape) and (max-height: 500px) and (max-width: 1023px)"
+  );
+
   let scheduled = false;
 
   function updateHeader() {
@@ -1207,8 +1211,9 @@ function initCompactHeader() {
     const scrollY = Math.max(0, window.scrollY);
     const compact = header.classList.contains("is-compact");
 
-    const shouldCompact = mobile.matches &&
-      (compact ? scrollY > 40 : scrollY > 150);
+    const shouldCompact = landscape.matches ||
+      (mobile.matches &&
+        (compact ? scrollY > 40 : scrollY > 150));
 
     if (compact === shouldCompact) return;
 
