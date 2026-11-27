@@ -1963,3 +1963,31 @@ button {
         gap: 8px;
     }
 }
+
+
+/* --- MOBILE KEYBOARD MANAGEMENT --- */
+
+@media (max-width: 1023px) {
+
+    .form-field input,
+    .form-field textarea,
+    .form-field select,
+    .event-form input,
+    .event-form select {
+        font-size: 16px;
+    }
+
+    .cart-panel {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        scroll-padding-top: 16px;
+        scroll-padding-bottom: 24px;
+    }
+
+    .cart-panel.keyboard-open {
+        bottom: var(--keyboard-bottom, 0px);
+        max-height: var(--keyboard-height, 82dvh);
+        overflow-y: auto;
+        transition: none;
+    }
+}

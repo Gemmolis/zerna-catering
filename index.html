@@ -74,7 +74,7 @@
               <label for="guestCount">Количество гостей *</label>
               <input
                 type="number"
-                id="guestCount"
+                id="guestCount" inputmode="numeric"
                 name="guestCount"
                 min="1"
                 step="1"
@@ -157,7 +157,7 @@
                 <input
                   type="text"
                   name="name"
-                  id="orderName"
+                  id="orderName" autocomplete="name"
                   placeholder="Как к вам обращаться"
                   required
                 />
@@ -167,7 +167,7 @@
                 <span>Телефон *</span>
                 <input
                   type="tel"
-                  id="phone"
+                  id="phone" autocomplete="tel" inputmode="tel"
                   name="phone"
                   class="form-input"
                   placeholder="+7 (___) ___-__-__"
@@ -204,7 +204,7 @@
                 <span>Адрес доставки</span>
                 <textarea
                   name="deliveryAddress"
-                  id="deliveryAddress"
+                  id="deliveryAddress" autocomplete="street-address"
                   rows="2"
                   placeholder="Город, улица, дом, помещение, этаж"
                 ></textarea>

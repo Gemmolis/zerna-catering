@@ -363,6 +363,117 @@ function isValidPhone(value) {
 }
 
 // --- Управление корзиной (UI) ---
+
+// --- MOBILE KEYBOARD MANAGEMENT ---
+
+function initMobileKeyboard() {
+  const viewport = window.visualViewport;
+
+  if (!viewport || !cartPanel) return;
+
+  const mobile = window.matchMedia(
+    "(max-width: 1023px) and (pointer: coarse)"
+  );
+
+  const editableSelector =
+    'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="date"]), textarea';
+
+  let frame = 0;
+
+  function resetKeyboardLayout() {
+    cartPanel.classList.remove("keyboard-open");
+    cartPanel.style.removeProperty("--keyboard-height");
+    cartPanel.style.removeProperty("--keyboard-bottom");
+  }
+
+  function updateKeyboardLayout() {
+    frame = 0;
+
+    const field = document.activeElement;
+    const layoutHeight =
+      document.documentElement.clientHeight;
+
+    const bottomOffset = Math.max(
+      0,
+      layoutHeight - viewport.height - viewport.offsetTop
+    );
+
+    const keyboardVisible =
+      layoutHeight - viewport.height > 100;
+
+    if (
+      !mobile.matches ||
+      !cartPanel.classList.contains("is-open") ||
+      !field ||
+      !cartPanel.contains(field) ||
+      !field.matches(editableSelector) ||
+      !keyboardVisible ||
+      Math.abs(viewport.scale - 1) > 0.05
+    ) {
+      resetKeyboardLayout();
+      return;
+    }
+
+    cartPanel.style.setProperty(
+      "--keyboard-height",
+      `${Math.max(0, viewport.height - 12)}px`
+    );
+
+    cartPanel.style.setProperty(
+      "--keyboard-bottom",
+      `${bottomOffset}px`
+    );
+
+    cartPanel.classList.add("keyboard-open");
+
+    const panelRect = cartPanel.getBoundingClientRect();
+    const fieldRect = field.getBoundingClientRect();
+
+    const visibleTop =
+      Math.max(panelRect.top, viewport.offsetTop) + 12;
+
+    const visibleBottom =
+      Math.min(
+        panelRect.bottom,
+        viewport.offsetTop + viewport.height
+      ) - 16;
+
+    if (fieldRect.top < visibleTop) {
+      cartPanel.scrollTop += fieldRect.top - visibleTop;
+    } else if (fieldRect.bottom > visibleBottom) {
+      cartPanel.scrollTop += Math.min(
+        fieldRect.bottom - visibleBottom,
+        fieldRect.top - visibleTop
+      );
+    }
+  }
+
+  function scheduleKeyboardUpdate() {
+    if (frame) return;
+    frame = requestAnimationFrame(updateKeyboardLayout);
+  }
+
+  viewport.addEventListener(
+    "resize", scheduleKeyboardUpdate
+  );
+
+  viewport.addEventListener(
+    "scroll", scheduleKeyboardUpdate
+  );
+
+  window.addEventListener(
+    "resize", scheduleKeyboardUpdate
+  );
+
+  cartPanel.addEventListener(
+    "focusin", scheduleKeyboardUpdate
+  );
+
+  cartPanel.addEventListener(
+    "focusout", scheduleKeyboardUpdate
+  );
+}
+
 function openCart() {
   if (cartPanel) cartPanel.classList.add("is-open");
   if (cartOverlay) cartOverlay.hidden = false;
@@ -370,6 +481,18 @@ function openCart() {
 }
 
 function closeCart() {
+  if (cartPanel) {
+    const activeField = document.activeElement;
+
+    if (activeField && cartPanel.contains(activeField)) {
+      activeField.blur();
+    }
+
+    cartPanel.classList.remove("keyboard-open");
+    cartPanel.style.removeProperty("--keyboard-height");
+    cartPanel.style.removeProperty("--keyboard-bottom");
+  }
+
   if (cartPanel) cartPanel.classList.remove("is-open");
   if (cartOverlay) cartOverlay.hidden = true;
   document.body.style.overflow = "";
@@ -1249,6 +1372,7 @@ function initCompactHeader() {
 
 // --- Инициализация при запуске ---
 initCompactHeader();
+initMobileKeyboard();
 loadCartFromStorage();
 bindStaticActions();
 loadMenu();
