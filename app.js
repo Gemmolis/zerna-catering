@@ -1191,7 +1191,59 @@ function initTelegramWebApp() {
   }
 }
 
+function initCompactHeader() {
+  const header = document.querySelector(".site-header");
+  if (!header) return;
+
+  const mobile = window.matchMedia(
+    "(max-width: 768px)"
+  );
+
+  let scheduled = false;
+
+  function updateHeader() {
+    scheduled = false;
+
+    const scrollY = Math.max(0, window.scrollY);
+    const compact = header.classList.contains("is-compact");
+
+    const shouldCompact = mobile.matches &&
+      (compact ? scrollY > 40 : scrollY > 150);
+
+    if (compact === shouldCompact) return;
+
+    const oldHeight = header.offsetHeight;
+
+    header.classList.toggle("is-compact", shouldCompact);
+
+    const heightDifference = header.offsetHeight - oldHeight;
+
+    if (shouldCompact && scrollY > oldHeight) {
+      window.scrollTo({
+        top: Math.max(0, scrollY + heightDifference),
+        behavior: "instant"
+      });
+    }
+  }
+
+  function scheduleUpdate() {
+    if (scheduled) return;
+
+    scheduled = true;
+    requestAnimationFrame(updateHeader);
+  }
+
+  window.addEventListener("scroll", scheduleUpdate, {
+    passive: true
+  });
+
+  window.addEventListener("resize", scheduleUpdate);
+
+  updateHeader();
+}
+
 // --- Инициализация при запуске ---
+initCompactHeader();
 loadCartFromStorage();
 bindStaticActions();
 loadMenu();
