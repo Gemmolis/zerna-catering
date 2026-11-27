@@ -1295,6 +1295,31 @@ async function loadMenu() {
 }
 
 // --- ИНТЕГРАЦИЯ С TELEGRAM ---
+
+function loadTelegramWebApp() {
+  if (window.Telegram?.WebApp) {
+    initTelegramWebApp();
+    return;
+  }
+
+  const script = document.createElement("script");
+
+  script.src =
+    "https://telegram.org/js/telegram-web-app.js";
+
+  script.async = true;
+
+  script.onload = () => {
+    initTelegramWebApp();
+  };
+
+  script.onerror = () => {
+    console.warn("Telegram Web App is unavailable");
+  };
+
+  document.head.appendChild(script);
+}
+
 function initTelegramWebApp() {
   if (window.Telegram && window.Telegram.WebApp) {
     const tg = window.Telegram.WebApp;
@@ -1377,4 +1402,4 @@ loadCartFromStorage();
 bindStaticActions();
 loadMenu();
 setPhoneMask();
-initTelegramWebApp();
+loadTelegramWebApp();
