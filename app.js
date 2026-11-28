@@ -269,6 +269,17 @@ function initDeliveryAddress() {
   function updateDeliveryAddress() {
     const isDelivery = pickupType.value === "delivery";
 
+    const timeLabel = document.getElementById("pickupTimeLabel");
+
+    if (timeLabel) {
+      timeLabel.textContent =
+        pickupType.value === "delivery"
+          ? "Желаемый интервал доставки *"
+          : pickupType.value === "pickup"
+            ? "Желаемый интервал самовывоза *"
+            : "Желаемый интервал получения *";
+    }
+
     addressField.hidden = !isDelivery;
     addressInput.required = isDelivery;
 
@@ -1017,6 +1028,7 @@ function getOrderFormData() {
   const phone = document.getElementById("phone")?.value.trim() || "";
   const vk = document.getElementById("orderVk")?.value.trim() || "";
   const pickupType = document.getElementById("pickupType")?.value || "";
+  const pickupTime = document.getElementById("pickupTime")?.value || "";
 
   const deliveryAddress =
     pickupType === "delivery"
@@ -1033,6 +1045,7 @@ function getOrderFormData() {
     customer: { name, phone, vk },
     order: {
       pickupType,
+      pickupTime,
       deliveryAddress,
       comment,
       items: cart.map((item) => ({
@@ -1217,7 +1230,8 @@ function bindStaticActions() {
       if (
         !orderData.customer.name ||
         !orderData.customer.phone ||
-        !orderData.order.pickupType
+        !orderData.order.pickupType ||
+        !orderData.order.pickupTime
       ) {
         setFormStatus("Пожалуйста, заполните обязательные поля.", "error");
         return;

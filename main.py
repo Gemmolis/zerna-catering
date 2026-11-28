@@ -135,6 +135,7 @@ def validate_event_date(event: EventData):
 
 class OrderData(BaseModel):
     pickupType: str = Field(..., description="delivery / pickup")
+    pickupTime: Optional[str] = None
     deliveryAddress: Optional[str] = None
     comment: Optional[str] = None
     items: List[OrderItem]
@@ -336,6 +337,16 @@ def build_admin_message(order_id: str, data: IncomingOrder) -> str:
         data.order.pickupType
     )
     lines.append(f"<b>Способ получения:</b> {safe(pickup_label)}")
+
+    if data.order.pickupTime:
+        time_label = (
+            "Желаемый интервал доставки"
+            if data.order.pickupType == "delivery"
+            else "Желаемый интервал самовывоза"
+        )
+        lines.append(
+            f"<b>{time_label}:</b> {safe(data.order.pickupTime)}"
+        )
     if data.order.pickupType == "delivery" and data.order.deliveryAddress:
         lines.append(
          f"<b>Адрес доставки:</b> {safe(data.order.deliveryAddress)}"
@@ -602,6 +613,23 @@ async def create_order(order: IncomingOrder, request: Request):
         raise HTTPException(
             status_code=400,
             detail="Не указаны данные мероприятия"
+        )
+
+    if not order.order.pickupTime:
+        raise HTTPException(
+            status_code=400,
+            detail="Укажите желаемое время получения заказа"
+        )
+
+    allowed_slots = {
+        f"{hour:02d}:00–{hour + 1:02d}:00"
+        for hour in range(10, 21)
+    }
+
+    if order.order.pickupTime not in allowed_slots:
+        raise HTTPException(
+            status_code=400,
+            detail="Выберите интервал получения с 10:00 до 21:00"
         )
 
     validate_event_date(order.order.event)
